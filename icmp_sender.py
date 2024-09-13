@@ -4,11 +4,30 @@ import sys
 
 # Function to validate IP address
 def validate_ip(ip):
-    try:
-        socket.inet_pton(socket.AF_INET, ip)
-        return True
-    except socket.error:
+    # Split the IP address into octets
+    octets = ip.split('.')
+
+    # Check if there are exactly four octets
+    if len(octets) != 4:
         return False
+
+    for octet in octets:
+        # Check if the octet is a valid integer
+        if not octet.isdigit():
+            return False
+
+        # Convert the octet to an integer
+        num = int(octet)
+
+        # Check if the integer is within the valid range
+        if not 0 <= num <= 255:
+            return False
+
+        # Ensure that no octet has leading zeros unless it's just '0'
+        if octet != str(num):
+            return False
+
+    return True
 
 
 # Function to calculate the checksum of the ICMP packet
@@ -101,7 +120,6 @@ def main():
         print(f"ICMP packet sent to {destination_ip}")
     except Exception as e:
         print(f"Failed to send packet: {e}")
-
     raw_socket.close()
 
 
