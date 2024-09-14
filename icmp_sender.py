@@ -1,22 +1,17 @@
 import socket
 import sys
 
-# Function to validate IP address
+# Validate an IP address
 def validate_ip(ip):
     octets = ip.split('.')
     if len(octets) != 4:
         return False
     for octet in octets:
-        if not octet.isdigit():
-            return False
-        num = int(octet)
-        if not 0 <= num <= 255:
-            return False
-        if octet != str(num):
+        if not octet.isdigit() or not 0 <= int(octet) <= 255:
             return False
     return True
 
-# Function to calculate the checksum of the packet
+# Calculate the checksum of the packet
 def checksum(data):
     sum = 0
     length = len(data)
@@ -31,35 +26,29 @@ def checksum(data):
     sum += (sum >> 16)
     return ~sum & 0xFFFF
 
-# Function to pack ICMP header manually
+# Pack ICMP header manually
 def pack_icmp_header(type, code, checksum, identifier, sequence_number):
     header = bytearray()
-    header.append(type)  # Type
-    header.append(code)  # Code
-    header.extend(checksum.to_bytes(2, byteorder='big'))  # Checksum
-    header.extend(identifier.to_bytes(2, byteorder='big'))  # Identifier
-    header.extend(sequence_number.to_bytes(2, byteorder='big'))  # Sequence Number
+    header.append(type)
+    header.append(code)
+    header.extend(checksum.to_bytes(2, 'big'))
+    header.extend(identifier.to_bytes(2, 'big'))
+    header.extend(sequence_number.to_bytes(2, 'big'))
     return header
 
-# Function to create an ICMP packet
+# Create ICMP packet
 def create_icmp_packet(id, sequence):
     type = 8  # Echo Request
     code = 0
     checksum_value = 0
-    identifier = id
-    sequence_number = sequence
-
-    icmp_header = pack_icmp_header(type, code, checksum_value, identifier, sequence_number)
+    icmp_header = pack_icmp_header(type, code, checksum_value, id, sequence)
     data = b'hello'
     packet = icmp_header + data
-
     checksum_value = checksum(packet)
-    icmp_header = pack_icmp_header(type, code, checksum_value, identifier, sequence_number)
-    packet = icmp_header + data
+    icmp_header = pack_icmp_header(type, code, checksum_value, id, sequence)
+    return icmp_header + data
 
-    return packet
-
-# Function to create an IP header manually
+# Create IP header manually
 def create_ip_header(source_ip, dest_ip, payload_length):
     version = 4
     ihl = 5
@@ -67,25 +56,25 @@ def create_ip_header(source_ip, dest_ip, payload_length):
     tot_len = 20 + payload_length
     id = 54321
     frag_off = 0
-    ttl = 255
+    ttl = 64
     protocol = socket.IPPROTO_ICMP
-    check = 0
     source = socket.inet_aton(source_ip)
     dest = socket.inet_aton(dest_ip)
 
-    # Manual IP header creation
     ip_header = bytearray()
-    ip_header.append((version << 4) + ihl)  # Version and IHL
-    ip_header.append(tos)  # Type of Service
-    ip_header.extend(tot_len.to_bytes(2, byteorder='big'))  # Total Length
-    ip_header.extend(id.to_bytes(2, byteorder='big'))  # Identification
-    ip_header.extend(frag_off.to_bytes(2, byteorder='big'))  # Fragment Offset
-    ip_header.append(ttl)  # Time to Live
-    ip_header.append(protocol)  # Protocol
-    ip_header.extend(check.to_bytes(2, byteorder='big'))  # Header Checksum (initially 0)
-    ip_header.extend(source)  # Source IP
-    ip_header.extend(dest)  # Destination IP
+    ip_header.append((version << 4) + ihl)
+    ip_header.append(tos)
+    ip_header.extend(tot_len.to_bytes(2, 'big'))
+    ip_header.extend(id.to_bytes(2, 'big'))
+    ip_header.extend(frag_off.to_bytes(2, 'big'))
+    ip_header.append(ttl)
+    ip_header.append(protocol)
+    ip_header.extend(b'\x00\x00')  # Initial checksum (will be calculated later)
+    ip_header.extend(source)
+    ip_header.extend(dest)
 
+    check = checksum(ip_header)
+    ip_header[10:12] = check.to_bytes(2, 'big')
     return ip_header
 
 def main():
@@ -109,18 +98,18 @@ def main():
         print("Permission denied: Raw sockets require root privileges.")
         sys.exit(1)
 
-    # Create ICMP packet
+    # Create and send ICMP packet
     icmp_payload = create_icmp_packet(id=1, sequence=1)
     ip_header = create_ip_header(source_ip, destination_ip, len(icmp_payload))
     packet = ip_header + icmp_payload
 
-    # Send the packet
     try:
         raw_socket.sendto(packet, (destination_ip, 0))
         print(f"ICMP packet sent to {destination_ip}")
     except Exception as e:
         print(f"Failed to send packet: {e}")
-    raw_socket.close()
+    finally:
+        raw_socket.close()
 
 if __name__ == "__main__":
     main()
