@@ -11,6 +11,10 @@ def validate_ip(ip):
             return False
     return True
 
+# Convert IP address to 4-byte binary representation
+def ip_to_bytes(ip):
+    return bytes(int(octet) for octet in ip.split('.'))
+
 # Calculate the checksum of the packet
 def checksum(data):
     sum = 0
@@ -57,9 +61,9 @@ def create_ip_header(source_ip, dest_ip, payload_length):
     id = 54321
     frag_off = 0
     ttl = 64
-    protocol = socket.IPPROTO_ICMP
-    source = socket.inet_aton(source_ip)
-    dest = socket.inet_aton(dest_ip)
+    protocol = 1  # ICMP protocol number
+    source = ip_to_bytes(source_ip)
+    dest = ip_to_bytes(dest_ip)
 
     ip_header = bytearray()
     ip_header.append((version << 4) + ihl)
